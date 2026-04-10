@@ -41,7 +41,9 @@ export default function Timeline({ clips, selectedClipId, onSelectClip }: Timeli
 
   const handlePlayheadMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
+    e.preventDefault();
     setIsDraggingPlayhead(true);
+    document.body.style.userSelect = 'none';
   };
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
@@ -52,8 +54,11 @@ export default function Timeline({ clips, selectedClipId, onSelectClip }: Timeli
   }, [isDraggingPlayhead, getTimeFromX, setPlayheadTime]);
 
   const handleMouseUp = useCallback(() => {
-    setIsDraggingPlayhead(false);
-  }, []);
+    if (isDraggingPlayhead) {
+      setIsDraggingPlayhead(false);
+      document.body.style.userSelect = '';
+    }
+  }, [isDraggingPlayhead]);
 
   // Attach global mouse handlers when dragging
   useEffect(() => {
@@ -72,7 +77,7 @@ export default function Timeline({ clips, selectedClipId, onSelectClip }: Timeli
   const handleZoomOut = () => setZoom(zoom / 1.2);
 
   return (
-    <div className="h-full flex flex-col bg-[#1a1a1a]">
+    <div className="h-full flex flex-col bg-[#1a1a1a] select-none">
       {/* Timeline Header */}
       <div className="h-8 bg-[#252525] border-b border-[#333] flex items-center px-2 gap-2">
         <span className="text-xs text-[#888]">时间线</span>
@@ -99,7 +104,7 @@ export default function Timeline({ clips, selectedClipId, onSelectClip }: Timeli
       {/* Timeline Content */}
       <div className="flex-1 overflow-auto" ref={timelineRef}>
         <div
-          className="relative min-h-full cursor-pointer"
+          className="relative min-h-full cursor-pointer select-none"
           style={{ width: `${timelineWidth}px` }}
           onClick={handleTimelineClick}
         >

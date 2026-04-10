@@ -1,5 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
+import { useProjectStore } from '../store/projectStore';
 
 interface VideoInfo {
   path: string;
@@ -19,6 +20,16 @@ const VIDEO_EXTENSIONS = ['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv'];
 
 export default function Preview({ videoUrl, videoInfo, onFileDrop, onImportClick }: PreviewProps) {
   const [isDragging, setIsDragging] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const { playheadTime, setPlayheadTime } = useProjectStore();
+
+  // Sync playhead with video when playhead changes (e.g., user drags timeline)
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video && videoUrl && Math.abs(video.currentTime - playheadTime) > 0.1) {
+      video.currentTime = playheadTime;
+    }
+  }, [playheadTime, videoUrl]);
 
   useEffect(() => {
     const webview = getCurrentWebview();
@@ -65,6 +76,13 @@ export default function Preview({ videoUrl, videoInfo, onFileDrop, onImportClick
     }
   }, [videoUrl, onImportClick]);
 
+  const handleTimeUpdate = useCallback(() => {
+    const video = videoRef.current;
+    if (video) {
+      setPlayheadTime(video.currentTime);
+    }
+  }, [setPlayheadTime]);
+
   return (
     <div className="h-full bg-[#1e1e1e] rounded-lg flex flex-col overflow-hidden">
       {/* Video Player */}
@@ -76,10 +94,12 @@ export default function Preview({ videoUrl, videoInfo, onFileDrop, onImportClick
       >
         {videoUrl ? (
           <video
+            ref={videoRef}
             key={videoUrl}
             src={videoUrl}
             className="max-w-full max-h-full object-contain"
             controls
+            onTimeUpdate={handleTimeUpdate}
           />
         ) : (
           <div className={`text-center ${isDragging ? 'text-[#4a9eff]' : 'text-[#666]'}`}>
