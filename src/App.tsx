@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import Toolbar from './components/Toolbar';
 import Preview from './components/Preview';
 import Timeline from './components/Timeline';
@@ -37,9 +37,8 @@ function App() {
         const info = await invoke<VideoInfo>('get_video_info', { path: selected });
         setVideoInfo(info);
 
-        // Convert to file URL for HTML5 video
-        // In Tauri, we use the asset protocol or convert file path
-        setVideoUrl(`file://${selected}`);
+        // Convert to file URL for HTML5 video using Tauri 2's convertFileSrc
+        setVideoUrl(convertFileSrc(selected));
 
         // Add clip to timeline
         addClip({
@@ -91,6 +90,36 @@ function App() {
     }
   }, [clips]);
 
+  const handleFileDrop = useCallback((file: File) => {
+    // In Tauri 2, dropped files may have a path property
+    const filePath = (file as any).path;
+    const url = filePath ? convertFileSrc(filePath) : URL.createObjectURL(file);
+    console.log('handleFileDrop: fileName=', file.name, 'path=', filePath, 'url=', url);
+    setVideoUrl(url);
+
+    // Get video duration from the file
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.onloadedmetadata = () => {
+      setVideoInfo({
+        path: file.name,
+        duration: video.duration,
+        width: video.videoWidth,
+        height: video.videoHeight,
+      });
+
+      addClip({
+        id: crypto.randomUUID(),
+        sourcePath: filePath || file.name,
+        startTime: 0,
+        endTime: video.duration,
+        inPoint: 0,
+        outPoint: video.duration,
+      });
+    };
+    video.src = url;
+  }, [addClip]);
+
   return (
     <div className="h-full w-full flex flex-col bg-[#1a1a1a] text-white">
       {/* Toolbar */}
@@ -100,7 +129,7 @@ function App() {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Preview Area */}
         <div className="h-[60%] p-4">
-          <Preview videoUrl={videoUrl} videoInfo={videoInfo} />
+          <Preview videoUrl={videoUrl} videoInfo={videoInfo} onFileDrop={handleFileDrop} onImportClick={handleImportVideo} />
         </div>
 
         {/* Timeline */}
