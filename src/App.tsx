@@ -93,14 +93,24 @@ function App() {
   const handleFileDrop = useCallback((file: File) => {
     // In Tauri 2, dropped files may have a path property
     const filePath = (file as any).path;
-    const url = filePath ? convertFileSrc(filePath) : URL.createObjectURL(file);
-    console.log('handleFileDrop: fileName=', file.name, 'path=', filePath, 'url=', url);
+    console.log('handleFileDrop: fileName=', file.name, 'path=', filePath);
+
+    let url: string;
+    if (filePath) {
+      url = convertFileSrc(filePath);
+      console.log('convertFileSrc url =', url);
+    } else {
+      url = URL.createObjectURL(file);
+      console.log('createObjectURL url =', url);
+    }
+
     setVideoUrl(url);
 
     // Get video duration from the file
     const video = document.createElement('video');
     video.preload = 'metadata';
     video.onloadedmetadata = () => {
+      console.log('Video loaded: duration=', video.duration, 'size=', video.videoWidth, 'x', video.videoHeight);
       setVideoInfo({
         path: file.name,
         duration: video.duration,
@@ -116,6 +126,9 @@ function App() {
         inPoint: 0,
         outPoint: video.duration,
       });
+    };
+    video.onerror = () => {
+      console.error('Video error:', video.error);
     };
     video.src = url;
   }, [addClip]);
