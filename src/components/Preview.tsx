@@ -69,7 +69,7 @@ export default function Preview({ videoUrl, videoInfo, onFileDrop, onImportClick
     <div className="h-full bg-[#1e1e1e] rounded-lg flex flex-col overflow-hidden">
       {/* Video Player */}
       <div
-        className={`flex-1 flex items-center justify-center bg-black relative cursor-pointer ${
+        className={`flex-1 min-h-0 flex items-center justify-center bg-black relative cursor-pointer ${
           isDragging ? 'ring-2 ring-[#4a9eff] ring-inset' : ''
         }`}
         onClick={handleClick}

@@ -1,3 +1,4 @@
+import { useCallback, useRef, useState, useEffect } from 'react';
 import { Clip, useProjectStore } from '../store/projectStore';
 import ClipItem from './ClipItem';
 
@@ -9,6 +10,8 @@ interface TimelineProps {
 
 export default function Timeline({ clips, selectedClipId, onSelectClip }: TimelineProps) {
   const { playheadTime, setPlayheadTime, zoom, setZoom } = useProjectStore();
+  const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
+  const timelineRef = useRef<HTMLDivElement>(null);
 
   const totalDuration = clips.reduce((acc, clip) => acc + (clip.outPoint - clip.inPoint), 0);
   const timelineWidth = Math.max(totalDuration * 50 * zoom, 800);
@@ -20,13 +23,50 @@ export default function Timeline({ clips, selectedClipId, onSelectClip }: Timeli
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
   };
 
+  const getTimeFromX = useCallback((x: number): number => {
+    if (!timelineRef.current) return 0;
+    const rect = timelineRef.current.getBoundingClientRect();
+    const scrollLeft = timelineRef.current.scrollLeft || 0;
+    const adjustedX = x - rect.left + scrollLeft;
+    const time = (adjustedX / timelineWidth) * totalDuration;
+    return Math.max(0, Math.min(time, totalDuration));
+  }, [timelineWidth, totalDuration]);
+
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const time = (x / (timelineWidth / totalDuration));
-    setPlayheadTime(Math.max(0, Math.min(time, totalDuration)));
+    if (isDraggingPlayhead) return;
+    const time = getTimeFromX(e.clientX);
+    setPlayheadTime(time);
     onSelectClip(null);
   };
+
+  const handlePlayheadMouseDown = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsDraggingPlayhead(true);
+  };
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (isDraggingPlayhead) {
+      const time = getTimeFromX(e.clientX);
+      setPlayheadTime(time);
+    }
+  }, [isDraggingPlayhead, getTimeFromX, setPlayheadTime]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDraggingPlayhead(false);
+  }, []);
+
+  // Attach global mouse handlers when dragging
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+    return undefined;
+  }, [handleMouseMove, handleMouseUp]);
 
   const handleZoomIn = () => setZoom(zoom * 1.2);
   const handleZoomOut = () => setZoom(zoom / 1.2);
@@ -57,7 +97,7 @@ export default function Timeline({ clips, selectedClipId, onSelectClip }: Timeli
       </div>
 
       {/* Timeline Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto" ref={timelineRef}>
         <div
           className="relative min-h-full cursor-pointer"
           style={{ width: `${timelineWidth}px` }}
@@ -79,9 +119,16 @@ export default function Timeline({ clips, selectedClipId, onSelectClip }: Timeli
 
           {/* Playhead */}
           <div
-            className="absolute top-0 bottom-0 w-0.5 bg-[#ff4444] z-20 pointer-events-none"
+            className="absolute top-0 bottom-0 w-0.5 bg-[#ff4444] z-20"
             style={{ left: `${(playheadTime / totalDuration) * 100}%` }}
-          />
+            onMouseDown={handlePlayheadMouseDown}
+          >
+            {/* Playhead Handle */}
+            <div
+              className="absolute -top-1 -left-2 w-4 h-4 bg-[#ff4444] rounded-sm cursor-ew-resize z-30"
+              onMouseDown={handlePlayheadMouseDown}
+            />
+          </div>
 
           {/* Clips */}
           <div className="pt-6">
